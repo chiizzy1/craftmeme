@@ -3,31 +3,30 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import Spinner from "@/components/ui/Spinner";
+import { LIQUIDITY_MANAGER_CONTRACT_ADDRESS } from "@/constants";
 import retrieveFromIPFS from "@/hooks/useGetImagefromIpfs";
 import { useGetTokenDetails } from "@/hooks/useGetTokenDetails";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { parseEther } from "viem";
+import { useSendTransaction, useWaitForTransactionReceipt } from "wagmi";
 
 export default function TokenDetailsPage() {
   const { tokenId } = useParams();
   const [tokenDetails, setTokenDetails] = useState<any>({});
   const [ipfsCid, setIpfsCid] = useState<string>("");
   const { fetchingToken, tokenFetched, token } = useGetTokenDetails(tokenId);
-
-  useEffect(() => {
-    if (tokenFetched) {
-      setTokenDetails(token as any);
-      console.log("token: ", token);
-    }
-  }, [tokenFetched, token]);
-
-  useEffect(() => {
-    if (tokenDetails?.ipfsHash) {
-      fetchIpfsCid(tokenDetails.ipfsHash);
-    }
-  }, [tokenDetails?.ipfsHash]);
+  const { sendTransaction, data: hash } = useSendTransaction();
+  const {
+    isLoading: isConfirming,
+    error,
+    isSuccess: isConfirmed,
+  } = useWaitForTransactionReceipt({
+    hash,
+  });
 
   const fetchIpfsCid = async (ipfsHash: string) => {
     try {
@@ -38,6 +37,39 @@ export default function TokenDetailsPage() {
     }
   };
 
+  useEffect(() => {
+    if (tokenFetched) {
+      setTokenDetails(token as any);
+    }
+  }, [tokenFetched, token]);
+
+  useEffect(() => {
+    if (tokenDetails?.ipfsHash) {
+      fetchIpfsCid(tokenDetails.ipfsHash);
+    }
+  }, [tokenDetails?.ipfsHash]);
+
+  useEffect(() => {
+    if (isConfirming) {
+      toast.loading("Transaction Pending");
+    }
+    toast.dismiss();
+
+    if (isConfirmed) {
+      toast.success("Transaction Successful", {
+        action: {
+          label: "View on Etherscan",
+          onClick: () => {
+            window.open(`https://sepolia.etherscan.io/tx/${hash}`);
+          },
+        },
+      });
+    }
+    if (error) {
+      toast.error("Transaction Failed");
+    }
+  }, [isConfirming, isConfirmed, error, hash]);
+
   if (fetchingToken) {
     return (
       <div className="w-full h-screen flex items-center justify-center">
@@ -45,7 +77,6 @@ export default function TokenDetailsPage() {
       </div>
     );
   }
-
   // Generate a random number between 200 and 400
   const randomNumber = Math.floor(Math.random() * (400 - 200 + 1)) + 200;
   const imageUrl = `https://picsum.photos/${randomNumber}`;
@@ -103,9 +134,17 @@ export default function TokenDetailsPage() {
                     <Link href={`/token/signers/${tokenId}`}>
                       <Button>Multisig Signature</Button>
                     </Link>
-                    <Link href={`/token/liquidity/${tokenId}`}>
-                      <Button>Add Liquidity</Button>
-                    </Link>
+
+                    <Button
+                      onClick={() =>
+                        sendTransaction({
+                          to: LIQUIDITY_MANAGER_CONTRACT_ADDRESS,
+                          value: parseEther("0.01"),
+                        })
+                      }
+                    >
+                      Add Liquidity
+                    </Button>
                   </div>
                 </div>
               </div>

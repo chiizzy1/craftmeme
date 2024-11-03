@@ -3,41 +3,69 @@
 import { ArrowLeft, Check, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-const mockSigners = [
-  {
-    address: "0x301C96eC196fB6E1FE8B7eb777F317E5261B37eB",
-    hasSigned: true,
-  },
-  {
-    address: "0x8b09520549fAf8B64B3E421A89465544619C388",
-    hasSigned: false,
-  },
-  {
-    address: "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
-    hasSigned: false,
-  },
-];
+import { useGetTokenDetails } from "@/hooks/useGetTokenDetails";
+import Spinner from "@/components/ui/Spinner";
+import { useSignWallet } from "@/hooks/useSignWallet";
+import { useAccount } from "wagmi";
+import { toast } from "sonner";
 
 export default function TokenSigners() {
+  const { isConnected } = useAccount();
   const { tokenId } = useParams();
-  const [signers, setSigners] = useState(mockSigners);
-  const [isSigningInProgress, setIsSigningInProgress] = useState(false);
+  const [signers, setSigners] = useState<any>([]);
+  const [tokenDetails, setTokenDetails] = useState<any>({});
+  const { fetchingToken, tokenFetched, token } = useGetTokenDetails(tokenId);
+  const { sign, isConfirmed, isConfirming, isPending } = useSignWallet();
 
-  const handleSign = async (address: string) => {
-    setIsSigningInProgress(true);
+  const handleSign = async () => {
+    if (!isConnected) {
+      toast.error("Wallet isn't connected, Please connect your wallet!");
+      return;
+    }
 
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setSigners((prevSigners) =>
-      prevSigners.map((signer) => (signer.address === address ? { ...signer, hasSigned: true } : signer))
-    );
-    setIsSigningInProgress(false);
+    try {
+      if (tokenDetails.txId) {
+        console.log(`Transaction ID: ${tokenDetails.txId.toString()}`);
+        await sign({ txId: tokenDetails.txId.toString() });
+      }
+    } catch (error) {
+      toast.error("Failed to create token", {
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+      });
+    }
   };
 
+  const handleDeploy = async () => {
+    if (!isConnected) {
+      toast.error("Wallet isn't connected, Please connect your wallet!");
+      return;
+    }
+
+    try {
+      
+    } catch (error) {
+      toast.error("Failed to create token", {
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+      });}
+  }
+
+  useEffect(() => {
+    if (tokenFetched) {
+      setTokenDetails(token as any);
+    }
+  }, [tokenFetched, token]);
+
+  if (fetchingToken) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
   return (
     <main className="py-[200px]">
       <div className="container max-w-5xl mx-auto w-full relative space-y-6">
@@ -55,25 +83,28 @@ export default function TokenSigners() {
             <CardTitle>Required Signatures</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {signers.map((signer, index) => (
-              <div key={signer.address} className="flex items-center justify-between p-4 rounded-lg border border-zinc-800">
-                <div className="flex items-center gap-4">
-                  <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center">{index + 1}</div>
-                  <div className="font-mono text-sm">{signer.address}</div>
-                </div>
-                {signer.hasSigned ? (
-                  <div className="flex items-center text-green-500">
-                    <Check className="w-5 h-5 mr-2" />
-                    Signed
+            {tokenDetails.signers ? (
+              tokenDetails.signers.map((signer: string, index: number) => (
+                <div key={signer} className="flex items-center justify-between p-4 rounded-lg border border-zinc-800">
+                  <div className="flex items-center gap-4">
+                    <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center">{index + 1}</div>
+                    <div className="font-mono text-sm">{signer}</div>
                   </div>
-                ) : (
-                  <Button onClick={() => handleSign(signer.address)} disabled={isSigningInProgress}>
-                    {isSigningInProgress && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+
+                  <Button onClick={handleSign} disabled={isConfirming}>
+                    {isConfirming && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                     Sign
                   </Button>
-                )}
-              </div>
-            ))}
+                </div>
+              ))
+            ) : (
+              <div>No signers available</div>
+            )}
+
+            <Button onClick={handleDeploy} disabled={isConfirming} size="lg">
+              {isConfirming && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Deploy your Contract
+            </Button>
           </CardContent>
         </Card>
       </div>

@@ -8,6 +8,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useGetTokenDetails } from "@/hooks/useGetTokenDetails";
 
 const mockLiquidityData = {
   currentLiquidity: 30,
@@ -18,6 +19,8 @@ export default function TokenLiquidity() {
   const { tokenId } = useParams();
   const [liquidityAmount, setLiquidityAmount] = useState("");
   const [currentLiquidity, setCurrentLiquidity] = useState(mockLiquidityData.currentLiquidity);
+
+  const { fetchingToken, tokenFetched, token } = useGetTokenDetails(tokenId);
 
   const handleAddLiquidity = async () => {
     if (!liquidityAmount) return;
